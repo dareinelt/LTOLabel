@@ -2,14 +2,19 @@
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader
+RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-gd
 
 # ---- Laufzeit-Image ----
 FROM php:8.3-apache
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" gd pdo_sqlite pdo_mysql mbstring fileinfo \
     && rm -rf /var/lib/apt/lists/* \
-    && docker-php-ext-install pdo_sqlite pdo_mysql mbstring fileinfo \
     && a2enmod rewrite
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
