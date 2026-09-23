@@ -7,14 +7,15 @@ RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --opti
 # ---- Laufzeit-Image ----
 FROM php:8.3-apache
 
+# pdo_sqlite, mbstring and fileinfo are already compiled into php:8.3;
+# only gd (FPDF) and pdo_mysql (optional MySQL driver) must be added here.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         libpng-dev \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
-        libsqlite3-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" gd pdo_sqlite pdo_mysql mbstring fileinfo \
+    && docker-php-ext-install -j"$(nproc)" gd pdo_mysql \
     && rm -rf /var/lib/apt/lists/* \
     && a2enmod rewrite
 

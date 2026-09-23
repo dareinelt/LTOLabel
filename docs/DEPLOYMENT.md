@@ -10,10 +10,11 @@
 
 ## Docker
 
-Das Image basiert auf dem offiziellen PHP-Apache-Image, installiert die
-PHP-Erweiterungen (`pdo_sqlite`, `pdo_mysql`, `mbstring`, `fileinfo`) und nutzt
-`public/` als DocumentRoot. Ein HEALTHCHECK prüft die Erreichbarkeit des
-Webservers unter `/`.
+Das Image basiert auf dem offiziellen PHP-Apache-Image (`php:8.3-apache`), das
+`pdo_sqlite`, `mbstring` und `fileinfo` bereits fest einkompiliert enthält.
+Zusätzlich installiert werden `gd` (für FPDF) und `pdo_mysql` (optionale
+MySQL-Anbindung). Als DocumentRoot dient `public/`. Ein HEALTHCHECK prüft die
+Erreichbarkeit des Webservers unter `/`.
 
 ```bash
 docker compose up --build
