@@ -1,0 +1,293 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Application\Application;
+use App\Application\BatchRequest;
+use App\Label\Label;
+use App\Label\MediaType;
+
+/**
+ * LTOLabel Kommandozeilen-Schnittstelle.
+ *
+ * Beispiele:
+ *   php bin/console label:create ARCHIVE01L8
+ *   php bin/console label:batch ARCHIVE 1 100 L8
+ *   php bin/console label:batch --type=CLEANING --start=1 --end=10
+ *   php bin/console label:list
+ *   php bin/console print:test --output=test.pdf
+ */
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "Nur über die Kommandozeile ausführbar.\n");
+    exit(1);
+}
+
+$app = Application::boot(dirname(__DIR__));
+$service = $app->labelService;
+$repository = $app->labels;
+
+[$command, $positional, $options] = parseArguments(array_slice($argv, 1));
+
+switch ($command) {
+    case 'label:create':
+        exit(cmdCreate($positional, $options, $service));
+    case 'label:batch':
+        exit(cmdBatch($positional, $options, $service));
+    case 'label:list':
+        exit(cmdList($options, $repository));
+    case 'print:test':
+        exit(cmdPrintTest($options, $app));
+    case 'help':
+    case '':
+    default:
+        usage();
+        exit($command === 'help' ? 0 : 1);
+}
+
+/**
+ * @param string[] $argv
+ * @return array{0: string, 1: string[], 2: array<string, string|bool>}
+ */
+function parseArguments(array $argv): array
+{
+    $command = $argv[0] ?? '';
+    $positional = [];
+    $options = [];
+
+    foreach (array_slice($argv, 1) as $arg) {
+        if (str_starts_with($arg, '--')) {
+            $pair = explode('=', substr($arg, 2), 2);
+            $options[$pair[0]] = $pair[1] ?? true;
+        } else {
+            $positional[] = $arg;
+        }
+    }
+
+    return [$command, $positional, $options];
+}
+
+/**
+ * @param string[] $pos
+ * @param array<string, string|bool> $opts
+ */
+function cmdCreate(array $pos, array $opts, \App\Application\LabelService $service): int
+{
+    $code = strtoupper((string) ($pos[0] ?? ''));
+    if ($code === '') {
+        fwrite(STDERR, "Aufruf: label:create <code> [--type=DATA|CLEANING] [--profile=...]\n");
+
+        return 1;
+    }
+
+    $profileName = profileName($opts, $service);
+    $type = detectMediaType($code, $profileName, $opts, $service);
+
+    $generation = substr($code, -2);
+    $label = new Label($code, $type, $generation);
+
+    $result = $service->createLabel($label, $profileName, stringOpt($opts, 'duplicate_action', 'skip'));
+    printCreateResult($result);
+
+    return $result['errors'] === [] && $result['created'] !== [] ? 0 : 1;
+}
+
+/**
+ * @param string[] $pos
+ * @param array<string, string|bool> $opts
+ */
+function cmdBatch(array $pos, array $opts, \App\Application\LabelService $service): int
+{
+    $typeValue = strtoupper(stringOpt($opts, 'type', 'DATA'));
+    $type = $typeValue === 'CLEANING' ? MediaType::CLEANING : MediaType::DATA;
+    $profileName = profileName($opts, $service);
+
+    if ($type === MediaType::DATA) {
+        $prefix = strtoupper((string) ($pos[0] ?? ''));
+        $start = (int) ($pos[1] ?? 1);
+        $end = (int) ($pos[2] ?? $start);
+        $mediaId = strtoupper((string) ($pos[3] ?? stringOpt($opts, 'media_id', 'L8')));
+    } else {
+        $prefix = '';
+        $start = (int) intOpt($opts, 'start', (int) ($pos[0] ?? 1));
+        $end = (int) intOpt($opts, 'end', $start);
+        $mediaId = null;
+    }
+
+    if ($end < $start) {
+        fwrite(STDERR, "Fehler: end < start.\n");
+
+        return 1;
+    }
+
+    $batch = new BatchRequest(
+        profileName: $profileName,
+        mediaType: $type,
+        start: $start,
+        count: $end - $start + 1,
+        prefix: $prefix,
+        mediaId: $mediaId,
+        notes: nullableStringOpt($opts, 'notes'),
+        location: nullableStringOpt($opts, 'location'),
+        duplicateAction: stringOpt($opts, 'duplicate_action', 'skip'),
+    );
+
+    $result = $service->createBatch($batch);
+
+    foreach ($result['errors'] as $error) {
+        fwrite(STDERR, "Fehler: $error\n");
+    }
+    printf("Erstellt: %d\n", count($result['created']));
+    if ($result['skipped'] !== []) {
+        printf("Übersprungen (Duplikate): %s\n", implode(', ', $result['skipped']));
+    }
+
+    return $result['errors'] === [] ? 0 : 1;
+}
+
+/**
+ * @param array<string, string|bool> $opts
+ */
+function cmdList(array $opts, \App\Database\LabelRepository $repository): int
+{
+    $filters = [];
+    $mediaType = strtoupper(stringOpt($opts, 'media_type', 'ALL'));
+    if ($mediaType !== 'ALL') {
+        $filters['media_type'] = $mediaType;
+    }
+    if (stringOpt($opts, 'search', '') !== '') {
+        $filters['search'] = stringOpt($opts, 'search', '');
+    }
+
+    $labels = $repository->findAll($filters);
+    foreach ($labels as $label) {
+        printf(
+            "%s  %-9s %-3s gedruckt=%dx\n",
+            $label->labelCode,
+            $label->mediaType->value,
+            $label->mediaGeneration,
+            $label->printCount
+        );
+    }
+    printf("Gesamt: %d\n", count($labels));
+
+    return 0;
+}
+
+/**
+ * @param array<string, string|bool> $opts
+ */
+function cmdPrintTest(array $opts, Application $app): int
+{
+    $profileName = profileName($opts, $app->labelService);
+    $pdf = $app->printService->renderTestSheet($profileName);
+    $content = $app->printService->toString($pdf);
+
+    $output = stringOpt($opts, 'output', 'ltolabel-test.pdf');
+    if (file_put_contents($output, $content) === false) {
+        fwrite(STDERR, "Fehler: Konnte \"$output\" nicht schreiben.\n");
+
+        return 1;
+    }
+    printf("Testseite geschrieben: %s\n", $output);
+
+    return 0;
+}
+
+/**
+ * @param array<string, string|bool> $opts
+ */
+function profileName(array $opts, \App\Application\LabelService $service): string
+{
+    $names = $service->profileNames();
+    $name = stringOpt($opts, 'profile', 'dell_ml3');
+
+    return in_array($name, $names, true) ? $name : ($names[0] ?? 'dell_ml3');
+}
+
+/**
+ * @param array<string, string|bool> $opts
+ */
+function detectMediaType(string $code, string $profileName, array $opts, \App\Application\LabelService $service): MediaType
+{
+    $explicit = strtoupper(stringOpt($opts, 'type', ''));
+    if ($explicit !== '') {
+        return $explicit === 'CLEANING' ? MediaType::CLEANING : MediaType::DATA;
+    }
+
+    $cleaning = $service->profile($profileName)->mediaType(MediaType::CLEANING);
+    if ($cleaning !== null && str_starts_with($code, $cleaning->prefix) && ($cleaning->suffix === null || str_ends_with($code, $cleaning->suffix))) {
+        return MediaType::CLEANING;
+    }
+
+    return MediaType::DATA;
+}
+
+/**
+ * @param array{created: Label[], skipped: string[], errors: string[]} $result
+ */
+function printCreateResult(array $result): void
+{
+    foreach ($result['errors'] as $error) {
+        fwrite(STDERR, "Fehler: $error\n");
+    }
+    foreach ($result['created'] as $label) {
+        printf("Erstellt: %s (%s)\n", $label->labelCode, $label->mediaType->label());
+    }
+    foreach ($result['skipped'] as $code) {
+        printf("Übersprungen (Duplikat): %s\n", $code);
+    }
+}
+
+/**
+ * @param array<string, string|bool> $opts
+ */
+function stringOpt(array $opts, string $key, string $default = ''): string
+{
+    $value = $opts[$key] ?? $default;
+
+    return is_scalar($value) ? (string) $value : $default;
+}
+
+/**
+ * @param array<string, string|bool> $opts
+ */
+function intOpt(array $opts, string $key, int $default): int
+{
+    $value = $opts[$key] ?? $default;
+
+    return is_numeric($value) ? (int) $value : $default;
+}
+
+/**
+ * @param array<string, string|bool> $opts
+ */
+function nullableStringOpt(array $opts, string $key): ?string
+{
+    $value = stringOpt($opts, $key, '');
+
+    return $value === '' ? null : $value;
+}
+
+function usage(): void
+{
+    echo <<<TXT
+LTOLabel – LTO-Barcode-Label für Dell EMC ML3
+
+Verwendung:
+  php bin/console label:create <code> [--type=DATA|CLEANING] [--profile=dell_ml3]
+  php bin/console label:batch <prefix> <start> <end> <mediaId> [--profile=dell_ml3]
+  php bin/console label:batch --type=CLEANING --start=1 --end=10
+  php bin/console label:list [--media_type=DATA|CLEANING] [--search=...]
+  php bin/console print:test [--profile=dell_ml3] [--output=test.pdf]
+
+Optionen:
+  --type=DATA|CLEANING   Medientyp (Standard: DATA)
+  --profile=<name>       Profil aus config/config.yaml
+  --duplicate_action=skip|replace
+  --notes=..., --location=...
+
+TXT;
+}

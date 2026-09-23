@@ -1,0 +1,8 @@
+.git
+vendor
+tests
+composer.phar
+.phpunit.cache
+config/config.local.yaml
+data/*.sqlite
+data/logs

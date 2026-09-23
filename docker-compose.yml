@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    volumes:
+      - ltolabel-data:/var/www/html/data
+    environment:
+      TZ: Europe/Berlin
+    restart: unless-stopped
+
+volumes:
+  ltolabel-data:
