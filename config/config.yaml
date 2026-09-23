@@ -1,0 +1,116 @@
+# LTOLabel – zentrale Konfiguration
+#
+# Diese Datei enthält die recherchierten Standardwerte (siehe docs/RESEARCH.md).
+# Lokale, maschinenspezifische Überschreibungen gehören in config/config.local.yaml
+# (gitignored) und werden hierüber gelegt.
+
+app:
+  name: LTOLabel
+  timezone: Europe/Berlin
+
+# Standardprofil für neue Labels (muss als Schlüssel unter "profiles" existieren).
+default_profile: dell_ml3
+
+database:
+  driver: sqlite
+  sqlite:
+    path: data/ltolabel.sqlite
+  # mysql:
+  #   host: 127.0.0.1
+  #   port: 3306
+  #   database: ltolabel
+  #   user: ltolabel
+  #   password: change-me
+  #   charset: utf8mb4
+
+logging:
+  path: data/logs
+  level: info
+
+printer:
+  dpi: 600
+
+# Seitengeometrie für den Blattdruck (alle Maße in mm).
+page:
+  format: A4
+  orientation: portrait
+  margin_top_mm: 10.0
+  margin_right_mm: 10.0
+  margin_bottom_mm: 10.0
+  margin_left_mm: 10.0
+  grid:
+    columns: 2
+    rows: 8
+    gap_horizontal_mm: 5.0
+    gap_vertical_mm: 5.0
+
+profiles:
+  # Dell EMC PowerVault ML3 – Standardprofil (LTO-Code-39-Labels).
+  dell_ml3:
+    label:
+      width_mm: 102.0
+      height_mm: 14.0
+    barcode:
+      type: CODE39
+      module_width_mm: 0.423
+      wide_narrow_ratio: 2.75
+      height_mm: 11.1
+      quiet_zone_mm: 4.0
+    text:
+      font: Helvetica
+      font_size_pt: 6.0
+      position: below        # "below" | "above" | "none"
+      show_label_code: true
+    media_types:
+      DATA:
+        total_length: 8
+        allowed_chars: "A-Z0-9"
+        media_ids: [L1, L2, L3, L4, L5, L6, L7, L8, L9, M8, LT, LU, LV, LW, LX, LY, LZ]
+        default_media_id: L8
+        prefix: ""
+        id:
+          volser_length: 6
+      CLEANING:
+        total_length: 8
+        allowed_chars: "A-Z0-9"
+        media_ids: [L1]
+        default_media_id: L1
+        prefix: CLN
+        suffix: L1
+        id:
+          sequence_length: 3
+
+  # Generisches LTO-Profil (identische Geometrie, als Vorlage für weitere Libraries).
+  generic_lto:
+    label:
+      width_mm: 102.0
+      height_mm: 14.0
+    barcode:
+      type: CODE39
+      module_width_mm: 0.423
+      wide_narrow_ratio: 2.75
+      height_mm: 11.1
+      quiet_zone_mm: 4.0
+    text:
+      font: Helvetica
+      font_size_pt: 6.0
+      position: below
+      show_label_code: true
+    media_types:
+      DATA:
+        total_length: 8
+        allowed_chars: "A-Z0-9"
+        media_ids: [L1, L2, L3, L4, L5, L6, L7, L8, L9, M8, LT, LU, LV, LW, LX, LY, LZ]
+        default_media_id: L8
+        prefix: ""
+        id:
+          volser_length: 6
+      CLEANING:
+        total_length: 8
+        allowed_chars: "A-Z0-9"
+        media_ids: [L1]
+        default_media_id: L1
+        prefix: CLN
+        suffix: L1
+        id:
+          sequence_length: 3

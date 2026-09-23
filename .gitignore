@@ -1,0 +1,9 @@
+/vendor/
+/composer.phar
+/data/*.sqlite
+/data/*.sqlite-*
+/data/logs/*
+/data/logs/.*
+/config/config.local.yaml
+!.gitkeep
+.phpunit.cache/

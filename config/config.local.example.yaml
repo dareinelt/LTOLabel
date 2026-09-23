@@ -1,0 +1,16 @@
+# Lokale Konfiguration (wird NICHT eingecheckt).
+#
+# Diese Datei nach config/config.local.yaml kopieren und anpassen.
+# Werte hier überschreiben die Einträge aus config/config.yaml.
+
+app:
+  timezone: Europe/Berlin
+
+# database:
+#   driver: mysql
+#   mysql:
+#     host: 127.0.0.1
+#     port: 3306
+#     database: ltolabel
+#     user: ltolabel
+#     password: change-me
