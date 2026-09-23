@@ -7,7 +7,9 @@ RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --opti
 # ---- Laufzeit-Image ----
 FROM php:8.3-apache
 
-RUN docker-php-ext-install pdo_sqlite pdo_mysql mbstring \
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-install pdo_sqlite pdo_mysql mbstring fileinfo \
     && a2enmod rewrite
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
@@ -26,5 +28,8 @@ COPY . .
 RUN chown -R www-data:www-data data \
     && find data -type d -exec chmod 775 {} \; \
     && find data -type f -exec chmod 664 {} \;
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -fsS http://127.0.0.1/ -o /dev/null
 
 EXPOSE 80

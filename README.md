@@ -126,11 +126,17 @@ docs/             Recherche, Installation, Druck, Deployment
 
 ## Docker
 
+Der Container enthält Apache als Webserver (`php:8.3-apache`) inklusive aller
+Abhängigkeiten. Start:
+
 ```bash
 docker compose up --build
 ```
 
-Weitere Hinweise in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Die Anwendung ist danach unter <http://localhost:8080> erreichbar (Container-Port 80).
+SQLite-Datenbank und Logs liegen im benannten Volume `ltolabel-data`; ein
+HEALTHCHECK überwacht die Erreichbarkeit unter `/`. Details zu Konfiguration,
+MySQL und Betrieb: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Lizenz
 
