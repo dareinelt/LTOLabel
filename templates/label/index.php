@@ -69,15 +69,32 @@
       </tbody>
     </table>
     <p class="actions">
-      <button type="submit" class="btn btn-primary">Auswahl drucken (Blatt)</button>
+      <button type="submit" id="print-selection" class="btn btn-primary" disabled>Auswahl drucken (Blatt)</button>
     </p>
   </form>
 <?php endif; ?>
 
 <script>
-document.getElementById('check-all').addEventListener('change', function () {
-  document.querySelectorAll('input[name="ids[]"]').forEach(function (cb) { cb.checked = this.checked; }, this);
-});
+(function () {
+  var boxes = document.querySelectorAll('input[name="ids[]"]');
+  var button = document.getElementById('print-selection');
+  var checkAll = document.getElementById('check-all');
+
+  function updateButton() {
+    var any = false;
+    boxes.forEach(function (cb) { if (cb.checked) { any = true; } });
+    button.disabled = !any;
+  }
+
+  boxes.forEach(function (cb) {
+    cb.addEventListener('change', updateButton);
+  });
+
+  checkAll.addEventListener('change', function () {
+    boxes.forEach(function (cb) { cb.checked = checkAll.checked; });
+    updateButton();
+  });
+})();
 </script>
 
 <?php require __DIR__ . '/../layout/footer.php'; ?>
