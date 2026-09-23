@@ -26,7 +26,7 @@ final class PdfGenerator
      */
     public function renderSheet(array $labels, Profile $profile, PageLayout $layout): FPDF
     {
-        $pdf = new FPDF('P', 'mm', [$layout->widthMm, $layout->heightMm]);
+        $pdf = $this->createPdf($layout->widthMm, $layout->heightMm);
         $pdf->SetMargins(0, 0, 0);
         $pdf->SetAutoPageBreak(false);
         $pdf->AddPage();
@@ -58,7 +58,7 @@ final class PdfGenerator
 
     public function renderSingle(Label $label, Profile $profile): FPDF
     {
-        $pdf = new FPDF('P', 'mm', [$profile->labelWidthMm, $profile->labelHeightMm]);
+        $pdf = $this->createPdf($profile->labelWidthMm, $profile->labelHeightMm);
         $pdf->SetMargins(0, 0, 0);
         $pdf->SetAutoPageBreak(false);
         $pdf->AddPage();
@@ -70,5 +70,18 @@ final class PdfGenerator
     public function toString(FPDF $pdf): string
     {
         return $pdf->Output('S');
+    }
+
+    /**
+     * Create an FPDF document whose page size matches the requested width and
+     * height exactly. FPDF stores portrait page sizes as [width <= height], so
+     * the orientation must be derived from the physical dimensions instead of
+     * being hard-coded to portrait (which would rotate landscape labels 90°).
+     */
+    private function createPdf(float $widthMm, float $heightMm): FPDF
+    {
+        $orientation = $widthMm > $heightMm ? 'L' : 'P';
+
+        return new FPDF($orientation, 'mm', [$widthMm, $heightMm]);
     }
 }

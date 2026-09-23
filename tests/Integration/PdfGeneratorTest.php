@@ -35,6 +35,16 @@ final class PdfGeneratorTest extends TestCase
         self::assertStringStartsWith('%PDF', $this->generator->toString($pdf));
     }
 
+    public function testRenderSingleUsesLandscapePageForWideLabel(): void
+    {
+        $label = new Label('ABC123L8', MediaType::DATA, 'L8');
+        $pdf = $this->generator->renderSingle($label, $this->profile);
+
+        // The label is 102 x 14 mm; the page must match and not be rotated.
+        self::assertEqualsWithDelta(102.0, $pdf->GetPageWidth(), 0.001);
+        self::assertEqualsWithDelta(14.0, $pdf->GetPageHeight(), 0.001);
+    }
+
     public function testRenderSheetProducesValidPdf(): void
     {
         $labels = [
